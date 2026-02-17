@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { addInspectorListener, InspectorEntry } from '../../lib/api/client';
+import { addInspectorListener, removeInspectorListener, InspectorEntry } from '../../lib/api/client';
 import { Trash2, ChevronRight, ChevronDown, Clock, ArrowRightLeft } from 'lucide-react';
 
 export const ApiInspector: React.FC = () => {
@@ -7,9 +7,15 @@ export const ApiInspector: React.FC = () => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
-        addInspectorListener((entry) => {
-            setEntries(prev => [entry, ...prev].slice(0, 50));
-        });
+        const handler = (entry: InspectorEntry) => {
+            setEntries(prev => {
+                // Prevent duplicates from multiple fires or re-renders
+                if (prev.some(e => e.id === entry.id)) return prev;
+                return [entry, ...prev].slice(0, 50);
+            });
+        };
+        addInspectorListener(handler);
+        return () => removeInspectorListener(handler);
     }, []);
 
     const clearHistory = () => {

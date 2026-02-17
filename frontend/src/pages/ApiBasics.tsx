@@ -51,7 +51,7 @@ const ApiBasics: React.FC = () => {
                     {pingResult && (
                         <div className="mt-4 p-3 bg-gray-50 rounded-lg w-full text-left">
                             <span className="text-[10px] font-bold text-gray-400 block mb-1">Response</span>
-                            <pre className="text-[10px] font-mono text-gray-600">{JSON.stringify(pingResult, null, 2)}</pre>
+                            <pre className="text-[10px] font-mono text-gray-600 whitespace-pre-wrap break-words">{JSON.stringify(pingResult, null, 2)}</pre>
                         </div>
                     )}
                 </div>
@@ -74,7 +74,7 @@ const ApiBasics: React.FC = () => {
                     {randomResult && (
                         <div className="mt-4 p-3 bg-gray-50 rounded-lg w-full text-left">
                             <span className="text-[10px] font-bold text-gray-400 block mb-1">Response</span>
-                            <pre className="text-[10px] font-mono text-gray-600">{JSON.stringify(randomResult, null, 2)}</pre>
+                            <pre className="text-[10px] font-mono text-gray-600 whitespace-pre-wrap break-words">{JSON.stringify(randomResult, null, 2)}</pre>
                         </div>
                     )}
                 </div>

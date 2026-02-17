@@ -21,6 +21,13 @@ export const addInspectorListener = (listener: InspectorListener) => {
     listeners.push(listener);
 };
 
+export const removeInspectorListener = (listener: InspectorListener) => {
+    const index = listeners.indexOf(listener);
+    if (index > -1) {
+        listeners.splice(index, 1);
+    }
+};
+
 const notifyInspector = (entry: InspectorEntry) => {
     listeners.forEach(l => l(entry));
 };
