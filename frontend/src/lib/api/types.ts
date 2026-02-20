@@ -1,47 +1,33 @@
-export interface ResponseEnvelope<T> {
-  ok: boolean;
+export interface ApiSuccessResponse<T = unknown> {
+  ok: true;
   data: T;
-  meta: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
-export interface ErrorEnvelope {
+export interface ApiErrorResponse {
   ok: false;
-  error: {
-    code: string;
-    message: string;
-    details: Record<string, string>;
-  };
+  error: string;
 }
 
-export interface HealthData {
-  status: string;
-  version: string;
+export type ApiResponse<T = unknown> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+export interface NormalizedResponse<T = unknown> {
+  ok: boolean;
+  data: T | null;
+  error: string | null;
+  meta?: Record<string, unknown>;
 }
 
-export interface PingData {
-  pong: string;
-  timestamp: number;
-}
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-export interface RandomData {
-  number: number;
-  message?: string;
-}
-
-export interface ToggleData {
-  value: boolean;
-}
-
-export interface Item {
+export interface ApiLogEntry {
   id: string;
-  title: string;
-  description: string;
-  tags: string[];
-}
-
-export interface JobStatus {
-  job_id: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
-  progress: number;
-  result?: any;
+  timestamp: Date;
+  method: HttpMethod;
+  url: string;
+  requestBody?: unknown;
+  responseBody?: unknown;
+  status?: number;
+  latencyMs: number;
+  error?: string;
 }

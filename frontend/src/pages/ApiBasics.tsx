@@ -1,108 +1,96 @@
-import React, { useState } from 'react';
-import { apiClient } from '../lib/api/client';
-import { DocCallout } from '../components/DocCallout/DocCallout';
-import { RefreshCw, Zap, Shuffle, ToggleLeft } from 'lucide-react';
+import { useState } from 'react';
+import { ping, random, toggle } from '@/lib/api/actions';
+import { PageHeader } from '@/components/Playground/PageHeader';
+import { PlaygroundSection, type PlaygroundStatus } from '@/components/Playground/PlaygroundSection';
 
-const ApiBasics: React.FC = () => {
-    const [pingResult, setPingResult] = useState<any>(null);
-    const [randomResult, setRandomResult] = useState<any>(null);
-    const [toggleValue, setToggleValue] = useState(false);
-    const [loading, setLoading] = useState<Record<string, boolean>>({});
+const sections = [
+  { id: 'ping', label: 'Ping' },
+  { id: 'random', label: 'Random' },
+  { id: 'toggle', label: 'Toggle' },
+];
 
-    const handleAction = async (key: string, fn: () => Promise<any>) => {
-        setLoading(prev => ({ ...prev, [key]: true }));
-        try {
-            const res = await fn();
-            if (key === 'ping') setPingResult(res.data);
-            if (key === 'random') setRandomResult(res.data);
-            if (key === 'toggle') setToggleValue(res.data.value);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(prev => ({ ...prev, [key]: false }));
-        }
-    };
+export default function ApiBasics() {
+  const [results, setResults] = useState<Record<string, { data: unknown; status: PlaygroundStatus }>>({});
+  const [toggleVal, setToggleVal] = useState(false);
 
-    return (
-        <div className="prose prose-slate max-w-none">
-            <h1 className="text-3xl font-bold text-gray-900 border-b border-gray-100 pb-4 mb-8">API Basics</h1>
+  const run = async (key: string, fn: () => Promise<unknown>) => {
+    setResults((r) => ({ ...r, [key]: { data: undefined, status: 'loading' } }));
+    try {
+      const res = await fn();
+      setResults((r) => ({ ...r, [key]: { data: res, status: 'success' } }));
+    } catch {
+      setResults((r) => ({ ...r, [key]: { data: 'Request failed', status: 'error' } }));
+    }
+  };
 
-            <p className="text-gray-600">
-                These demos cover simple stateless actions: <strong>Ping</strong>, <strong>Random</strong>, and <strong>Toggle</strong>.
-                They are perfect for verifying that the frontend can talk to the backend.
-            </p>
+  const r = (key: string) => results[key] ?? { data: undefined, status: 'idle' as PlaygroundStatus };
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 not-prose my-12">
-                {/* Ping */}
-                <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
-                        <Zap size={24} />
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-2">Ping</h3>
-                    <p className="text-xs text-gray-500 mb-6">Simple heartbeat check</p>
-                    <button
-                        onClick={() => handleAction('ping', apiClient.ping)}
-                        disabled={loading.ping}
-                        className="w-full py-2 px-4 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-                    >
-                        {loading.ping && <RefreshCw size={16} className="animate-spin" />}
-                        <span>Send Ping</span>
-                    </button>
-                    {pingResult && (
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg w-full text-left">
-                            <span className="text-[10px] font-bold text-gray-400 block mb-1">Response</span>
-                            <pre className="text-[10px] font-mono text-gray-600 whitespace-pre-wrap break-words">{JSON.stringify(pingResult, null, 2)}</pre>
-                        </div>
-                    )}
-                </div>
+  return (
+    <div className="max-w-2xl mx-auto">
+      <PageHeader
+        title="API Basics"
+        description="Three fundamental request patterns. Each button fires a call through the centralized API client — watch the Inspector panel to see method, URL, latency, and response."
+        sections={sections}
+      />
 
-                {/* Random */}
-                <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center mb-4">
-                        <Shuffle size={24} />
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-2">Random</h3>
-                    <p className="text-xs text-gray-500 mb-6">Fetch a random number</p>
-                    <button
-                        onClick={() => handleAction('random', apiClient.random)}
-                        disabled={loading.random}
-                        className="w-full py-2 px-4 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-                    >
-                        {loading.random && <RefreshCw size={16} className="animate-spin" />}
-                        <span>Get Random</span>
-                    </button>
-                    {randomResult && (
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg w-full text-left">
-                            <span className="text-[10px] font-bold text-gray-400 block mb-1">Response</span>
-                            <pre className="text-[10px] font-mono text-gray-600 whitespace-pre-wrap break-words">{JSON.stringify(randomResult, null, 2)}</pre>
-                        </div>
-                    )}
-                </div>
+      <div className="space-y-6">
+        <PlaygroundSection
+          id="ping"
+          title="Ping"
+          description="A simple health-check GET request. Verifies the backend is reachable."
+          learnCallout="This is the simplest possible API call — a GET with no parameters. Great for testing connectivity."
+          status={r('ping').status}
+          result={r('ping').data}
+          expectedResponse={{ ok: true, data: { status: 'healthy', timestamp: '2024-01-01T00:00:00Z' } }}
+          notes={<p>The <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/health</code> endpoint should return a simple status object. If the backend is down, you'll see a network error in the Inspector.</p>}
+        >
+          <button
+            onClick={() => run('ping', ping)}
+            className="px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Send Ping
+          </button>
+        </PlaygroundSection>
 
-                {/* Toggle */}
-                <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4">
-                        <ToggleLeft size={24} className={toggleValue ? 'rotate-180 transition-transform' : 'transition-transform'} />
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-2">Toggle</h3>
-                    <p className="text-xs text-gray-500 mb-6 font-medium">State: {toggleValue ? 'ON' : 'OFF'}</p>
-                    <button
-                        onClick={() => handleAction('toggle', () => apiClient.toggle(toggleValue))}
-                        disabled={loading.toggle}
-                        className="w-full py-2 px-4 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-                    >
-                        {loading.toggle && <RefreshCw size={16} className="animate-spin" />}
-                        <span>Toggle State</span>
-                    </button>
-                </div>
-            </div>
+        <PlaygroundSection
+          id="random"
+          title="Random"
+          description="GET request that returns randomized data on each call."
+          learnCallout="Try clicking multiple times — each response is different. This demonstrates non-idempotent GET patterns."
+          status={r('random').status}
+          result={r('random').data}
+          expectedResponse={{ ok: true, data: { value: 42, uuid: 'abc-123' } }}
+        >
+          <button
+            onClick={() => run('random', random)}
+            className="px-4 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:opacity-90 transition-opacity"
+          >
+            Get Random
+          </button>
+        </PlaygroundSection>
 
-            <DocCallout type="tip" title="Try it out!">
-                Click any of the buttons above and watch the <strong>API Inspector</strong>.
-                You'll see the full request and response details, including latency and the simplified data envelope.
-            </DocCallout>
-        </div>
-    );
-};
-
-export default ApiBasics;
+        <PlaygroundSection
+          id="toggle"
+          title="Toggle"
+          description="POST request that sends a boolean payload and receives confirmation."
+          learnCallout="This shows how to send a JSON body with a POST. Check the Inspector to see the request payload."
+          status={r('toggle').status}
+          result={r('toggle').data}
+          expectedResponse={{ ok: true, data: { value: true, toggled_at: '2024-01-01T00:00:00Z' } }}
+          notes={<p>The toggle state is local — the backend simply echoes whatever value you send. This pattern is useful for testing POST request serialization.</p>}
+        >
+          <button
+            onClick={() => {
+              const next = !toggleVal;
+              setToggleVal(next);
+              run('toggle', () => toggle(next));
+            }}
+            className="px-4 py-2 text-sm rounded-md bg-secondary text-secondary-foreground hover:opacity-90 transition-opacity"
+          >
+            Toggle → {toggleVal ? 'OFF' : 'ON'}
+          </button>
+        </PlaygroundSection>
+      </div>
+    </div>
+  );
+}

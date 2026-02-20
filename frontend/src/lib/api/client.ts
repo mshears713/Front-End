@@ -1,98 +1,69 @@
-import { API_ROUTES } from './routes';
-import { ResponseEnvelope, ErrorEnvelope } from './types';
+import type { HttpMethod, NormalizedResponse, ApiLogEntry } from './types';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+let _pushLog: ((entry: ApiLogEntry) => void) | null = null;
 
-export interface InspectorEntry {
-    id: string;
-    method: string;
-    url: string;
-    status: number;
-    latency: number;
-    requestBody: any;
-    responseBody: any;
-    timestamp: string;
+export function bindInspector(pushLog: (entry: ApiLogEntry) => void) {
+  _pushLog = pushLog;
 }
 
-type InspectorListener = (entry: InspectorEntry) => void;
-const listeners: InspectorListener[] = [];
+let idCounter = 0;
 
-export const addInspectorListener = (listener: InspectorListener) => {
-    listeners.push(listener);
-};
+export async function apiCall<T = unknown>(
+  method: HttpMethod,
+  url: string,
+  body?: unknown
+): Promise<NormalizedResponse<T>> {
+  const start = performance.now();
+  const id = `req_${++idCounter}_${Date.now()}`;
 
-export const removeInspectorListener = (listener: InspectorListener) => {
-    const index = listeners.indexOf(listener);
-    if (index > -1) {
-        listeners.splice(index, 1);
-    }
-};
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
 
-const notifyInspector = (entry: InspectorEntry) => {
-    listeners.forEach(l => l(entry));
-};
+    const latencyMs = Math.round(performance.now() - start);
+    const json = await res.json().catch(() => ({}));
 
-async function request<T>(
-    method: string,
-    path: string,
-    body?: any
-): Promise<T> {
-    const url = `${BASE_URL}${path}`;
-    const start = performance.now();
+    const normalized: NormalizedResponse<T> = json.ok === true
+      ? { ok: true, data: json.data as T, error: null, meta: json.meta }
+      : { ok: false, data: null, error: json.error ?? `HTTP ${res.status}` };
 
-    let responseBody: any;
-    let status = 0;
+    _pushLog?.({
+      id,
+      timestamp: new Date(),
+      method,
+      url,
+      requestBody: body,
+      responseBody: json,
+      status: res.status,
+      latencyMs,
+    });
 
-    try {
-        const response = await fetch(url, {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: body ? JSON.stringify(body) : undefined,
-        });
+    return normalized;
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - start);
+    const error = err instanceof Error ? err.message : 'Unknown error';
 
-        status = response.status;
-        responseBody = await response.json();
+    _pushLog?.({
+      id,
+      timestamp: new Date(),
+      method,
+      url,
+      requestBody: body,
+      latencyMs,
+      error,
+    });
 
-        if (!response.ok) {
-            throw responseBody;
-        }
-
-        return responseBody;
-    } catch (error) {
-        if (!responseBody) {
-            responseBody = { ok: false, error: { code: 'NETWORK_ERROR', message: 'Failed to connect to server' } };
-        }
-        throw error;
-    } finally {
-        const latency = Math.round(performance.now() - start);
-        notifyInspector({
-            id: Math.random().toString(36).substr(2, 9),
-            method,
-            url,
-            status,
-            latency,
-            requestBody: body,
-            responseBody,
-            timestamp: new Date().toISOString(),
-        });
-    }
+    return { ok: false, data: null, error };
+  }
 }
 
-export const apiClient = {
-    health: () => request<any>('GET', API_ROUTES.HEALTH),
-    ping: () => request<any>('GET', API_ROUTES.PING),
-    random: () => request<any>('GET', API_ROUTES.RANDOM),
-    toggle: (value: boolean) => request<any>('POST', API_ROUTES.TOGGLE, { value }),
-    validateForm: (data: any) => request<any>('POST', API_ROUTES.VALIDATE, data),
-    listItems: (params: { q?: string; page?: number; page_size?: number }) => {
-        const searchParams = new URLSearchParams();
-        if (params.q) searchParams.append('q', params.q);
-        if (params.page) searchParams.append('page', params.page.toString());
-        if (params.page_size) searchParams.append('page_size', params.page_size.toString());
-        return request<any>('GET', `${API_ROUTES.ITEMS}?${searchParams.toString()}`);
-    },
-    createJob: () => request<any>('POST', API_ROUTES.JOBS),
-    getJob: (jobId: string) => request<any>('GET', `${API_ROUTES.JOBS}/${jobId}`),
+export const api = {
+  get: <T = unknown>(url: string) => apiCall<T>('GET', url),
+  post: <T = unknown>(url: string, body?: unknown) => apiCall<T>('POST', url, body),
+  put: <T = unknown>(url: string, body?: unknown) => apiCall<T>('PUT', url, body),
+  patch: <T = unknown>(url: string, body?: unknown) => apiCall<T>('PATCH', url, body),
+  delete: <T = unknown>(url: string) => apiCall<T>('DELETE', url),
 };
